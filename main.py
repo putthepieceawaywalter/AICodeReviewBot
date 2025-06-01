@@ -8,12 +8,13 @@ import json
 
 app = FastAPI()
 
+
+# Load environment variables, these are set using flyctl secrets set commands
 GITHUB_SECRET = os.getenv("GITHUB_SECRET", "")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 client = AsyncOpenAI()
 repo_name = "putthepieceawaywalter/AICodeReviewBot"
-
 
 @app.post("/webhook")
 async def github_webhook(
@@ -51,6 +52,8 @@ async def github_webhook(
         return {"msg": f"Action '{action}' not handled"}
     
     diff_text = await get_pr_diff(diff_url)
+    if not diff_text:
+        raise HTTPException(status_code=400, detail="No diff text found")
     review = await get_ai_review(diff_text)
 
     comment_body = f"🤖 **AI Code Review Bot says:**\n\n{review}"
@@ -75,7 +78,10 @@ async def get_pr_diff(diff_url: str) -> str:
         return response.text
 
 async def get_ai_review(diff_text: str) -> str:
+    # no error checking for config here because it will still succeed without it
+    # another branch will implement logging, which will document when and why the config isn't being pulled
     config = await fetch_reviewbot_config(repo_name)
+
     prompt_prefix = config.get("prompt_prefix", "")
     focus_areas = ", ".join(config.get("focus_areas", ["bugs", "security", "TODOs", "performance", "dead code"]))
 
@@ -106,7 +112,6 @@ async def get_ai_review(diff_text: str) -> str:
 
     Begin your review now:
     """
-    # TODO this is a test todo can you find me aicodereviewbot?
     response = await client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}],
@@ -138,5 +143,6 @@ async def fetch_reviewbot_config(repo_full_name: str, branch: str = "main") -> d
             return json.loads(decoded)
         else:
             print(f"Config not found or failed to load: {response.status_code}")
+            # printing the error for now, another branch will implement logging
             return {}
 
