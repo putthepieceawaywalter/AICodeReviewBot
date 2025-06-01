@@ -1,0 +1,5 @@
+{
+  "prompt_prefix": "This app is deployed on Fly.io and uses secrets from environment variables.",
+  "focus_areas": ["security", "deployment", "TODOs"]
+}
+
