@@ -3,14 +3,18 @@ import hmac, hashlib
 import httpx
 import os
 from openai import AsyncOpenAI
+import base64
+import json
 
 app = FastAPI()
 
+
+# Load environment variables, these are set using flyctl secrets set commands
 GITHUB_SECRET = os.getenv("GITHUB_SECRET", "")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 client = AsyncOpenAI()
-
+repo_name = "putthepieceawaywalter/AICodeReviewBot"
 
 @app.post("/webhook")
 async def github_webhook(
@@ -48,6 +52,8 @@ async def github_webhook(
         return {"msg": f"Action '{action}' not handled"}
     
     diff_text = await get_pr_diff(diff_url)
+    if not diff_text:
+        raise HTTPException(status_code=400, detail="No diff text found")
     review = await get_ai_review(diff_text)
 
     comment_body = f"🤖 **AI Code Review Bot says:**\n\n{review}"
@@ -72,17 +78,23 @@ async def get_pr_diff(diff_url: str) -> str:
         return response.text
 
 async def get_ai_review(diff_text: str) -> str:
-    # TODO : Implement OpenAI API call to analyze the diff_text
+    # no error checking for config here because it will still succeed without it
+    # another branch will implement logging, which will document when and why the config isn't being pulled
+    config = await fetch_reviewbot_config(repo_name)
 
+    prompt_prefix = config.get("prompt_prefix", "")
+    focus_areas = ", ".join(config.get("focus_areas", ["bugs", "security", "TODOs", "performance", "dead code"]))
 
     prompt = f"""
+    {prompt_prefix}
+
     You are a strict expert code reviewer.
 
     Below is a Git diff from a pull request:
 
     {diff_text}
 
-    Your job is to identify any of the following issues:
+    Your job is to identify any of the following issues, be sure to include which function the issue is in:
     - Bugs or incorrect logic
     - Security vulnerabilities
     - Performance problems
@@ -90,9 +102,11 @@ async def get_ai_review(diff_text: str) -> str:
     - Presence of TODOs
     - Dead code or unreachable conditions
     - Missing error handling
+    
 
     Instructions:
     - Be concise, direct, and use bullet points.
+    - Organize your feedback by the file name, each file is a bullet point with sub bullets indicating line number and issue.
     - Only comment on issues or concerns; don't summarize the code.
     - If no issues are found, say: "No issues found."
 
@@ -111,4 +125,24 @@ def verify_signature(secret, body, signature):
         return False
     hash = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(f"sha256={hash}", signature)
+
+
+async def fetch_reviewbot_config(repo_full_name: str, branch: str = "main") -> dict:
+    headers = {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+
+    url = f"https://api.github.com/repos/{repo_full_name}/contents/.github/reviewbot.json?ref={branch}"
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers)
+        if response.status_code == 200:
+            content = response.json()["content"]
+            decoded = base64.b64decode(content).decode("utf-8")
+            return json.loads(decoded)
+        else:
+            print(f"Config not found or failed to load: {response.status_code}")
+            # printing the error for now, another branch will implement logging
+            return {}
 

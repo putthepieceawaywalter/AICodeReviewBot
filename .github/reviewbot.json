@@ -1,5 +1,5 @@
 {
-  "prompt_prefix": "This app is deployed on Fly.io and uses secrets from environment variables. Ignore the file reviewbot.json, it is not relevant to the review.",
+  "prompt_prefix": "This app is deployed on Fly.io and uses secrets from environment variables. Variables defined globally must be named what they are named to meet dependencies. Ignore the file reviewbot.json, it is not relevant to the review.",
   "focus_areas": ["security", "deployment", "TODOs"]
 }
 
