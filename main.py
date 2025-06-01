@@ -3,6 +3,8 @@ import hmac, hashlib
 import httpx
 import os
 from openai import AsyncOpenAI
+import base64
+import json
 
 app = FastAPI()
 
@@ -10,6 +12,7 @@ GITHUB_SECRET = os.getenv("GITHUB_SECRET", "")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 client = AsyncOpenAI()
+repo_name = "putthepieceawaywalter/AICodeReviewBot"
 
 
 @app.post("/webhook")
@@ -72,11 +75,9 @@ async def get_pr_diff(diff_url: str) -> str:
         return response.text
 
 async def get_ai_review(diff_text: str) -> str:
-    # TODO : Implement OpenAI API call to analyze the diff_text
-
     config = await fetch_reviewbot_config(repo_name)
     prompt_prefix = config.get("prompt_prefix", "")
-    focus_areas = ", ".join(config.get("focus_areas", ["bugs, security, TODOs, performance, dead code"]))
+    focus_areas = ", ".join(config.get("focus_areas", ["bugs", "security", "TODOs", "performance", "dead code"]))
 
     prompt = f"""
     {prompt_prefix}
@@ -87,7 +88,7 @@ async def get_ai_review(diff_text: str) -> str:
 
     {diff_text}
 
-    Your job is to identify any of the following issues, be sure to include line number:
+    Your job is to identify any of the following issues, be sure to include which function the issue is in:
     - Bugs or incorrect logic
     - Security vulnerabilities
     - Performance problems
@@ -105,6 +106,7 @@ async def get_ai_review(diff_text: str) -> str:
 
     Begin your review now:
     """
+    # TODO this is a test todo can you find me aicodereviewbot?
     response = await client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}],
