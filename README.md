@@ -12,7 +12,3 @@ This project is an AI-powered GitHub Pull Request review bot that automatically 
 5. Create a pull request
 6. The bot will automatically comment on the PR with feedback based on the changes made.
 
-d
-
-
-
