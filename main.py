@@ -146,6 +146,3 @@ async def fetch_reviewbot_config(repo_full_name: str, branch: str = "main") -> d
             # printing the error for now, another branch will implement logging
             return {}
 
-async def badBad():
-    return False
-
