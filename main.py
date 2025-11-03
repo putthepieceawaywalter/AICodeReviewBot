@@ -120,6 +120,10 @@ async def get_ai_review(diff_text: str) -> str:
     )
     return response.choices[0].message.content.strip()
 
+def coolFunction():
+    # TODO make a cool function here
+    return -1
+
 def verify_signature(secret, body, signature):
     if not signature:
         return False
